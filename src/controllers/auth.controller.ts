@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { users } from "../models/user";
+import userModel from "../models/user.model";
 
 export const register = async (req: Request, res: Response) => {
   const { name, email, password, confirmPassword } = req.body;
@@ -10,7 +10,9 @@ export const register = async (req: Request, res: Response) => {
     return res.status(400).send("As senhas não coincidem.");
   }
 
-  if (users.find((u) => u.email === email)) {
+  const userExists = await userModel.findByEmail(email);
+
+  if (userExists) {
     return res.status(400).send("Email já cadastrado.");
   }
 
@@ -18,9 +20,9 @@ export const register = async (req: Request, res: Response) => {
   const hashedPassword = await bcrypt.hash(password, salt);
 
   const user = { name, email, password: hashedPassword };
-  users.push(user);
+  userModel.create(user);
 
-  console.log(users);
+  console.log(await userModel.findAll());
 
   res.status(201).send("Usuário registrado com sucesso!");
 };
@@ -28,15 +30,17 @@ export const register = async (req: Request, res: Response) => {
 export const login = async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
-  const user = users.find((u) => u.email === email);
-  if (!user) {
+  const userExists = await userModel.findByEmailWithPassword(email);
+  if (!userExists) {
     return res.status(400).send("Email ou senha incorretos.");
   }
 
-  const validPassword = await bcrypt.compare(password, user.password);
+  const validPassword = await bcrypt.compare(password, userExists.password);
   if (!validPassword) {
     return res.status(400).send("Email ou senha incorretos.");
   }
+
+  console.log(await userModel.findAll());
 
   const token = jwt.sign({ email }, "12345678", {
     expiresIn: "12h",
